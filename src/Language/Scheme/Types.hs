@@ -4,6 +4,7 @@ module Language.Scheme.Types
   ( Env
   , liftThrows
   , LispError(..)
+  , LispNumber(..)
   , LispVal(..)
   , lispValToSExpr
   , IOThrowsError
@@ -37,7 +38,7 @@ liftThrows (Right val) = EvalM $ lift $ pure val
 data SExpr = SAtom String
            | SList [SExpr]
            | SDottedList [SExpr] SExpr
-           | SNumber Integer
+           | SNumber LispNumber
            | SChar Char
            | SString String
            | SVector (Array Int SExpr)
@@ -62,7 +63,7 @@ data LispVal = Unspecified
              | Atom String
              | List [LispVal]
              | DottedList [LispVal] LispVal
-             | Number Integer
+             | Number LispNumber
              | Char Char
              | String String
              | Vector (Array Int LispVal)
@@ -154,3 +155,74 @@ instance Show LispError where show = showError
 unwordsList :: Show a => [a] -> String
 unwordsList = unwords . map show
 
+data LispNumber = Integer Integer | Double Double
+
+instance Num LispNumber where
+  (+) = addNumber
+  (*) = mulNumber
+  negate = negateNumber
+  abs = absNumber
+  signum = signumNumber
+  fromInteger = Integer
+
+instance Fractional LispNumber where
+  (/) = divNumber
+  recip = divNumber 1
+  fromRational = Double . fromRational
+
+instance Real LispNumber where
+  -- toRational
+
+-- Double은 Enum타입이 아니니까 사용 할수  없음 => mod 구현은 어디다가?
+-- instance Integral LispNumber where
+--   toInteger = toIntegerNumber
+
+instance RealFrac LispNumber where
+  properFraction = properFractionNumber
+
+instance Eq LispNumber where (==) a b = (compare a b) == EQ
+instance Ord LispNumber where compare = compareNumber
+instance Show LispNumber where show = showNumber
+
+showNumber :: LispNumber -> String
+showNumber (Integer a) = show a
+showNumber (Double a) = show a
+
+toIntegerNumber :: LispNumber -> Integer
+toIntegerNumber (Integer a) = a
+toIntegerNumber (Double a) = floor a
+
+toDouble :: LispNumber -> Double
+toDouble (Integer a) = fromInteger a
+toDouble (Double a) = a
+
+addNumber :: LispNumber -> LispNumber -> LispNumber
+addNumber (Integer a) (Integer b) = Integer $ a + b
+addNumber a b = Double $ (toDouble a) + (toDouble b)
+
+mulNumber :: LispNumber -> LispNumber -> LispNumber
+mulNumber (Integer a) (Integer b) = Integer $ a * b
+mulNumber a b = Double $ (toDouble a) * (toDouble b)
+
+divNumber :: LispNumber -> LispNumber -> LispNumber
+divNumber a b = Double $ (toDouble a) / (toDouble b)
+
+negateNumber :: LispNumber -> LispNumber
+negateNumber (Integer a) = Integer $ negate a
+negateNumber a = Double $ negate (toDouble a)
+
+absNumber :: LispNumber -> LispNumber
+absNumber (Integer a) = Integer $ abs a
+absNumber a = Double $ abs (toDouble a)
+
+signumNumber :: LispNumber -> LispNumber
+signumNumber (Integer a) = Integer $ signum a
+signumNumber a = Double $ signum $ toDouble a
+
+properFractionNumber :: Integral b => LispNumber -> (b, LispNumber)
+properFractionNumber (Integer a) = (fromInteger a, Integer 0)
+properFractionNumber (Double a) = (fromInteger $ round a, Double $ a - (fromInteger $ round a))
+
+compareNumber :: LispNumber -> LispNumber -> Ordering
+compareNumber (Integer a) (Integer b) = compare a b
+compareNumber a b = compare (toDouble a) (toDouble b)

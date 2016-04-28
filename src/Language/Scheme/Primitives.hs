@@ -18,7 +18,7 @@ import Language.Scheme.Types
 
 data Unpacker = forall a. Eq a => AnyUnpacker (LispVal -> ThrowsError a)
 
-numericBinop :: (Integer -> Integer -> Integer) -> [LispVal] -> ThrowsError LispVal
+numericBinop :: (LispNumber -> LispNumber -> LispNumber) -> [LispVal] -> ThrowsError LispVal
 numericBinop op singleVal@[_] = throwError $ NumArgs 2 singleVal
 numericBinop op params = traverse unpackNum params >>= pure . Number . foldl1 op
 
@@ -36,7 +36,7 @@ boolBinop unpacker op args = if length args /= 2
                                      right <- unpacker $ args !! 1
                                      pure $ Bool $ left `op` right
 
-numBoolBinop :: (Integer -> Integer -> Bool) -> [LispVal] -> ThrowsError LispVal
+numBoolBinop :: (LispNumber -> LispNumber -> Bool) -> [LispVal] -> ThrowsError LispVal
 numBoolBinop = boolBinop unpackNum
 
 charBoolBinopCI :: (Char -> Char -> Bool) -> [LispVal] -> ThrowsError LispVal
@@ -54,13 +54,13 @@ strBoolBinop = boolBinop unpackStr
 boolBoolBinop :: (Bool -> Bool -> Bool) -> [LispVal] -> ThrowsError LispVal
 boolBoolBinop = boolBinop unpackBool
 
-unpackNum :: LispVal -> ThrowsError Integer
+unpackNum :: LispVal -> ThrowsError LispNumber
 unpackNum = \case
   (Number n) -> pure n
   (String n) -> let parsed = reads n in
                           if null parsed
                             then throwError $ TypeMismatch "number" $ String n
-                            else pure $ fst $ head parsed
+                            else pure $ Integer $ fst $ head parsed
   (List [n]) -> unpackNum n
   notNum     -> throwError $ TypeMismatch "number" notNum
 
@@ -180,11 +180,16 @@ isString = \case
   [_]         -> pure . Bool $ False
   badArgList  -> throwError $ NumArgs 1 badArgList
 
+mustInteger :: LispNumber -> ThrowsError Integer
+mustInteger (Integer a) = pure a
+mustInteger a = throwError $ TypeMismatch "integer" (Number a)
+
 substring :: [LispVal] -> ThrowsError LispVal
 substring = \case
   [String s, Number start, Number end] -> do
-    let start' = fromIntegral start
-    let end' = fromIntegral end
+    start' <- fromIntegral <$> mustInteger start
+    end' <- fromIntegral <$> mustInteger end
+
     unless (inRange s start') $ throwError $ OutOfRange (0, length s) start'
     unless (inRange s end')   $ throwError $ OutOfRange (0, length s) start'
     when (start' > end')      $ throwError $ OutOfRange (start', length s) end'
@@ -267,7 +272,7 @@ charToInteger = \case
 
 integerToChar :: [LispVal] -> ThrowsError LispVal
 integerToChar = \case
-  [Number c]  -> pure . Char . chr . fromIntegral $ c
+  [Number c]  -> mustInteger c >>= \c -> pure . Char . chr . fromIntegral $ c
   [badArg]    -> throwError $ TypeMismatch "number" badArg
   badArgList  -> throwError $ NumArgs 1 badArgList
 
@@ -301,10 +306,11 @@ primitives :: [(String, [LispVal] -> ThrowsError LispVal)]
 primitives = [("+", numericBinop (+)),
               ("-", numericBinop (-)),
               ("*", numericBinop (*)),
-              ("/", numericBinop div),
-              ("mod", numericBinop mod),
-              ("quotient", numericBinop quot),
-              ("remainder", numericBinop rem),
+              ("/", numericBinop (/)),
+              -- FIXME: Modulo Operators
+              -- ("modolo", numericBinop mod),
+              -- ("quotient", numericBinop quot),
+              -- ("remainder", numericBinop rem),
               ("=", numBoolBinop (==)),
               ("<", numBoolBinop (<)),
               (">", numBoolBinop (>)),

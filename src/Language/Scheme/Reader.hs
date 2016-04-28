@@ -78,8 +78,8 @@ schemeNumber :: Parser SExpr
 schemeNumber = do sign <- optional $ oneOf "+-"
                   digits <- some digitChar
                   pure $ case sign of
-                           Just '-' -> SNumber . negate . read $ digits
-                           _        -> SNumber . read $ digits
+                           Just '-' -> SNumber . Integer . negate . read $ digits
+                           _        -> SNumber . Integer . read $ digits
 
 schemeList :: Parser SExpr
 schemeList = SList <$> endBy schemeExpr sc
