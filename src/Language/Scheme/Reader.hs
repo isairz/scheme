@@ -74,12 +74,20 @@ schemeAtom = do first <- letterChar <|> schemeSymbolChar
                   _    -> SAtom atom
 
 -- FIXME: Recognize floating point numbers
+fraction :: Parser String
+fraction = do
+  void (char '.')
+  d <- some digitChar
+  pure $ '.' : d
+
 schemeNumber :: Parser SExpr
 schemeNumber = do sign <- optional $ oneOf "+-"
                   digits <- some digitChar
-                  pure $ case sign of
-                           Just '-' -> SNumber . Integer . negate . read $ digits
-                           _        -> SNumber . Integer . read $ digits
+                  frac <- optional fraction
+                  let signFunc = if (sign == Just '-') then negate else id
+                  pure $ case frac of
+                    Just f -> SNumber . signFunc . Double . read $ digits ++ f
+                    Nothing -> SNumber . signFunc . Integer . read $ digits
 
 schemeList :: Parser SExpr
 schemeList = SList <$> endBy schemeExpr sc
