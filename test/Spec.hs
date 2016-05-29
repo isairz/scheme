@@ -35,13 +35,21 @@ evalSpec = do
       evalStringOne env "\"foo\"" `shouldReturn` (Right $ String "foo")
 
   describe "number" $ do
-    it "evaluates a positive number" $ do
+    it "evaluates a positive integer number" $ do
       env <- newEnv
       evalStringOne env "123" `shouldReturn` (Right $ Number 123)
 
-    it "evaluates a negative number" $ do
+    it "evaluates a negative integer number" $ do
       env <- newEnv
       evalStringOne env "-123" `shouldReturn` (Right . Number . negate $ 123)
+
+    it "evaluates a positive floating number" $ do
+      env <- newEnv
+      evalStringOne env "123.4" `shouldReturn` (Right $ Number 123.4)
+
+    it "evaluates a negative floating number" $ do
+      env <- newEnv
+      evalStringOne env "-123.4" `shouldReturn` (Right . Number . negate $ 123.4)
 
   describe "atom" $ do
     it "evaluates to itself" $ do
@@ -73,6 +81,49 @@ evalSpec = do
       env <- newEnv
       evalStringOne env "(define x 28)" `shouldReturn` (Right $ Number 28)
       evalStringOne env "x" `shouldReturn` (Right $ Number 28)
+
+  describe "number arithmetic procedures" $ do
+    it "impose a total arithmetic on the set of numbers" $ do
+      env <- newEnv
+      evalStringOne env "(+ 3 4)" `shouldReturn` (Right $ Number 7)
+      evalStringOne env "(* 3 4)" `shouldReturn` (Right $ Number 12)
+      evalStringOne env "(- 3 4)" `shouldReturn` (Right $ Number $ -1)
+      evalStringOne env "(/ 3 4)" `shouldReturn` (Right $ Number $ 3 / 4)
+      evalStringOne env "(+ 1.2 3.4)" `shouldReturn` (Right $ Number 4.6)
+      evalStringOne env "(* 1.2 3.4)" `shouldReturn` (Right $ Number 4.08)
+      evalStringOne env "(- 1.2 3.4)" `shouldReturn` (Right $ Number $ -2.2)
+      evalStringOne env "(/ 1.2 3.4)" `shouldReturn` (Right $ Number $ 1.2 / 3.4)
+      -- FIXME: one or zero arguments
+      -- evalStringOne env "(+)" `shouldReturn` (Right $ Number 0)
+      -- evalStringOne env "(*)" `shouldReturn` (Right $ Number 1)
+      -- evalStringOne env "(+ 3)" `shouldReturn` (Right $ Number 3)
+      -- evalStringOne env "(* 3)" `shouldReturn` (Right $ Number 3)
+      -- evalStringOne env "(- 3)" `shouldReturn` (Right $ Number $ -3)
+      -- evalStringOne env "(/ 3)" `shouldReturn` (Right $ Number $ 1 / 4)
+
+  describe "number comparison procedures" $ do
+    it "impose a total oredering on the set of numbers" $ do
+      env <- newEnv
+      evalStringOne env "(= 1 1)" `shouldReturn` (Right $ Bool True)
+      evalStringOne env "(= 1 1.0)" `shouldReturn` (Right $ Bool True)
+      evalStringOne env "(= 1.0 1.0)" `shouldReturn` (Right $ Bool True)
+      evalStringOne env "(= 1 2)" `shouldReturn` (Right $ Bool False)
+      evalStringOne env "(= 1 2.0)" `shouldReturn` (Right $ Bool False)
+      evalStringOne env "(= 1.0 2.0)" `shouldReturn` (Right $ Bool False)
+
+      evalStringOne env "(< 1 2)" `shouldReturn` (Right $ Bool True)
+      evalStringOne env "(< 1 2.0)" `shouldReturn` (Right $ Bool True)
+      evalStringOne env "(< 1.0 2.0)" `shouldReturn` (Right $ Bool True)
+      evalStringOne env "(< 1 1)" `shouldReturn` (Right $ Bool False)
+      evalStringOne env "(< 1 1.0)" `shouldReturn` (Right $ Bool False)
+      evalStringOne env "(< 1.0 1.0)" `shouldReturn` (Right $ Bool False)
+
+      evalStringOne env "(> 2 1)" `shouldReturn` (Right $ Bool True)
+      evalStringOne env "(> 2 1.0)" `shouldReturn` (Right $ Bool True)
+      evalStringOne env "(> 2 1.0)" `shouldReturn` (Right $ Bool True)
+      evalStringOne env "(> 1 1)" `shouldReturn` (Right $ Bool False)
+      evalStringOne env "(> 1 1.0)" `shouldReturn` (Right $ Bool False)
+      evalStringOne env "(> 1.0 1.0)" `shouldReturn` (Right $ Bool False)
 
   describe "type predicates" $ do
     it "return #t if the object is of the named type" $ do
